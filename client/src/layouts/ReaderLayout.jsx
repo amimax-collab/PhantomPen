@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { Search, Library, Compass, Trophy, User } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { Link, useNavigate } from 'react-router-dom'
 
 const tabs = [
   { to: '/library', label: 'Library', Icon: Library },
@@ -9,11 +11,15 @@ const tabs = [
 ]
 
 export default function ReaderLayout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  async function signOut() { await logout(); navigate('/') }
   return (
     <div className="min-h-screen bg-gradient-to-b from-cream to-white pb-20 md:pb-0">
       <header className="sticky top-0 z-10 bg-cream/90 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <span className="text-xl font-extrabold text-brand">NovelHub</span>
+          {user ? <div className="ml-auto flex items-center gap-3 text-sm"><Link to="/profile" className="font-medium text-ink">{user.name}</Link><button onClick={signOut} className="text-brand">Log out</button></div> : <Link to="/login" className="ml-auto text-sm font-semibold text-brand">Sign in</Link>}
           <div className="flex flex-1 items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm">
             <Search size={18} className="text-gray-400" />
             <input className="w-full text-sm outline-none" placeholder="Search books..." />
