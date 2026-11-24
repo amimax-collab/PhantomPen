@@ -1,7 +1,15 @@
 import pg from 'pg'
 
 const { Pool } = pg
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const databaseUrl = process.env.DATABASE_URL
+const databaseHost = databaseUrl ? new URL(databaseUrl).hostname : ''
+const isLocalDatabase = ['localhost', '127.0.0.1', '::1'].includes(databaseHost)
+const sslDisabled = process.env.DATABASE_SSL === 'false'
+
+export const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: isLocalDatabase || sslDisabled ? false : { rejectUnauthorized: false },
+})
 
 export async function migrate() {
   await pool.query(`
@@ -14,6 +22,23 @@ export async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'display_name'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'name'
+      ) THEN
+        ALTER TABLE users RENAME COLUMN display_name TO name;
+      END IF;
+    END $$;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'reader';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users(email);
     CREATE TABLE IF NOT EXISTS books (
       id BIGSERIAL PRIMARY KEY,
       author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
